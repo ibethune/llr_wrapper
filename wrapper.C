@@ -1,38 +1,15 @@
-// Berkeley Open Infrastructure for Network Computing
-// http://boinc.berkeley.edu
+// BOINC wrapper for running the LLR application
+// Based on an old version of the wrapper developed
+// by Andrew J. Younge and provided by BOINC
+// See http://boinc.berkeley.edu/trac/wiki/WrapperApp for details
 // Copyright (C) 2005 University of California
-//
-// This is free software; you can redistribute it and/or
-// modify it under the terms of the GNU Lesser General Public
-// License as published by the Free Software Foundation;
-// either version 2.1 of the License, or (at your option) any later version.
-//
-// This software is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU Lesser General Public License for more details.
-//
-// To view the GNU Lesser General Public License visit
+// Licensed under the GNU Lesser General Public License
 // http://www.gnu.org/copyleft/lesser.html
-// or write to the Free Software Foundation, Inc.,
-// 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 // wrapper.C
-// wrapper program - lets you use non-BOINC apps with BOINC
-//
-// Handles:
-// - suspend/resume/quit/abort
-// - reporting CPU time
-// - loss of heartbeat from core client
-//
-// Does NOT handle:
-// - checkpointing
-// If your app does checkpointing,
-// and there's some way to figure out when it's done it,
-// this program could be modified to report to the core client.
-//
-// See http://boinc.berkeley.edu/wrapper.php for details
-// Contributor: Andrew J. Younge (ajy4490@umiacs.umd.edu)
+
+// Current version modified by Iain Bethune
+// iain@pyramid-productions.net
 
 #include <iostream>
 #include <fstream>
@@ -53,8 +30,19 @@
 
 #define POLL_PERIOD 1.0
 
+#define STR2(x) #x
+#define STR(x) STR2(x)
+
+#ifndef ARCH_TRIPLET
+#error "ARCH_TRIPLET must be defined e.g. x86_64-apple-darwin"
+#endif
+
+#ifndef BITNESS
+#error "BITNESS must be defined e.g. 64 or 32"
+#endif
+
 // The name of the executable that does the actual work:
-const std::string capp_name = "primegrid_llr_x86_64-apple-darwin";
+const std::string capp_name = "primegrid_llr_" STR(ARCH_TRIPLET);
 const std::string ini_file_name = "llr.ini.orig";
 const std::string in_file_name = "llr.in";
 const std::string out_file_name = "llr.out";
@@ -297,7 +285,7 @@ int main(int argc, char** argv)
     options.handle_process_control = true;
 
     std::cerr << "BOINC llr wrapper" << std::endl;
-    std::cerr << "Using Jean Penne's llr (64 bit)\n" << std::endl;
+    std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)\n" << std::endl;
 
     boinc_init_options(&options);
 

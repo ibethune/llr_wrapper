@@ -1,0 +1,33 @@
+# This should work on Linux.  Modify as needed for other platforms.
+
+# Change the following to match your installation
+BOINC_DIR = /Users/julieiain/Documents/pyramid/primegrid/boinc/boinc-6.7.4
+BOINC_API_DIR = $(BOINC_DIR)/api
+BOINC_LIB_DIR = $(BOINC_DIR)/lib
+export MACOSX_DEPLOYMENT_TARGET=10.5
+
+CXX = g++
+
+CXXFLAGS = -g \
+    -arch x86_64 -isystem /Developer/SDKs/MacOSX10.5.sdk  -DMAC_OS_X_VERSION_MIN_REQUIRED=1050 -mmacosx-version-min=10.5 -F"/Developer/SDKs/MacOSX10.5.sdk/System/Library/Frameworks/" \
+    -I$(BOINC_DIR) \
+    -I$(BOINC_LIB_DIR) \
+    -I$(BOINC_API_DIR) \
+    -I$(BOINC_DIR)/clientgui/mac \
+    -DARCH_TRIPLET=x86_64-apple-darwin \
+    -DBITNESS=64
+
+LDFLAGS = -Wl,-syslibroot,/Developer/SDKs/MacOSX10.5.sdk -arch x86_64 \
+    -L$(BOINC_API_DIR) \
+    -L$(BOINC_LIB_DIR) 
+
+PROG = primegrid_llr_wrapper_1.00_x86_64-apple-darwin
+
+all: $(PROG)
+
+clean:
+	rm -f $(PROG) *.o
+
+$(PROG): wrapper.o
+	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lstdc++ -lpthread -lboinc_api -lboinc
+
