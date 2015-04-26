@@ -46,7 +46,8 @@ const std::string capp_name = "primegrid_llr_" STR(ARCH_TRIPLET);
 const std::string ini_file_name = "llr.ini.orig";
 const std::string in_file_name = "llr.in";
 const std::string out_file_name = "llr.out";
-const std::string llr_args = "-d";
+const std::string llr_verbose = "-d";
+const std::string llr_version = "-v";
 
 int fdOutputRead;
 bool bGotFFT = false;
@@ -88,7 +89,29 @@ int TASK::run(const std::string& app)
 {
     int retval;
 
+    // Run LLR to get the version number
+
+    pid = fork();
+    if (pid == -1) {
+        boinc_finish(ERR_FORK);
+    }
+    if (pid == 0) {
+        // we're in the child process here
+        dup2(STDERR_FILENO,STDOUT_FILENO);
+        retval = execl(app.c_str(), app.c_str(), llr_version.c_str(), NULL);
+        std::cerr << "execl failed: " << strerror(errno) << std::endl;
+        exit(ERR_EXEC);
+    }else{
+      // In the parent process
+      int status;
+      // Wait for LLR to exit
+      waitpid(pid, &status, WNOHANG);
+    }
+
+    // Now run LLR again to perform the test
+
     int fd_out[2];
+
     if (pipe(fd_out) < 0) {
       fprintf(stderr, "Failed to create pipe\n");
       return 250; // 250: Failed to create pipe
@@ -100,14 +123,13 @@ int TASK::run(const std::string& app)
         boinc_finish(ERR_FORK);
     }
     if (pid == 0) {
-		// we're in the child process here
+	// we're in the child process here
 
         close(fd_out[0]);
         dup2(fd_out[1],STDOUT_FILENO);
-        std::cerr << "wrapper: running " << app << " " << llr_args << std::endl;
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
-        retval = execl(app.c_str(), app.c_str(), llr_args.c_str(), NULL);
-        std::cerr << "execv failed: " << strerror(errno) << std::endl;
+        retval = execl(app.c_str(), app.c_str(), llr_verbose.c_str(), NULL);
+        std::cerr << "execl failed: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }else{
       // In the parent process
@@ -198,9 +220,10 @@ double read_status()
   ssize_t len;
   if ((len = read(fdOutputRead,buf,sizeof(buf)-1)) > 0)
   {
-    const char *fft_key[] = {"Used fftlen =", "FFT length"};
+    const char *fft_key[] = {"Using"};
     const char *iter_key[] = {"iteration :", "bit:", "Iter:", "Bit:"};
-    const char *str;
+    char *str,*end;
+    char *line;
     size_t i;
     char ch;
     int x, y;
@@ -210,12 +233,16 @@ double read_status()
     if (bGotFFT == false)
       for (i = 0; i < sizeof(fft_key)/sizeof(fft_key[0]); i++)
         if ((str = strstr(buf,fft_key[i])) != NULL)
-          if (sscanf(str+strlen(fft_key[i])," %d%c",&x,&ch) == 2)
-          {
-            fprintf(stderr,"FFT length: %d%s\n",x,(ch=='K')?"K":"");
-            bGotFFT = true;
-            break;
-          }
+        {
+          end = str;
+          // Find the next new line or carriage return
+          while (*end != '\0' && *end != '\r' && *end != '\n') end++;
+          *end = '\0';
+
+          fprintf(stderr,"%s\n",str);
+          bGotFFT = true;
+          break;
+        }
 
     for (i = 0; i < sizeof(iter_key)/sizeof(iter_key[0]); i++)
       if ((str = strstr(buf,iter_key[i])) != NULL)
