@@ -1,0 +1,28 @@
+# Change the following to match your installation
+BOINC_DIR = ../boinc_64_707/
+
+CXX = g++
+
+CXXFLAGS = -g \
+    -m64 \
+    -I$(BOINC_DIR)/include/boinc \
+    -DARCH_TRIPLET=x86_64-pc-linux-gnu \
+    -DBITNESS=64
+
+
+LDFLAGS = -static -m64 \
+    -L$(BOINC_DIR)/lib
+
+PROG = primegrid_llr_wrapper_1.00_x86_64-pc-linux-gnu
+
+all: wrapper
+
+clean:
+	rm -f $(PROG) *.o
+
+distclean:
+	/bin/rm -f $(PROG) *.o
+
+wrapper: wrapper.o
+	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lpthread -lboinc_api -lboinc
+
