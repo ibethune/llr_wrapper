@@ -30,19 +30,14 @@
 
 #define POLL_PERIOD 1.0
 
-#define STR2(x) #x
-#define STR(x) STR2(x)
-
-#ifndef ARCH_TRIPLET
-#error "ARCH_TRIPLET must be defined e.g. x86_64-apple-darwin"
-#endif
-
 #ifndef BITNESS
 #error "BITNESS must be defined e.g. 64 or 32"
 #endif
 
+#define WRAPPER_VERSION "7.00"
+
 // The name of the executable that does the actual work:
-const std::string capp_name = "primegrid_llr_" STR(ARCH_TRIPLET);
+const std::string capp_name = "primegrid_llr";
 const std::string ini_file_name = "llr.ini.orig";
 const std::string in_file_name = "llr.in";
 const std::string out_file_name = "llr.out";
@@ -311,7 +306,7 @@ int main(int argc, char** argv)
     options.check_heartbeat = true;
     options.handle_process_control = true;
 
-    std::cerr << "BOINC llr wrapper" << std::endl;
+    std::cerr << "BOINC llr wrapper (version " << WRAPPER_VERSION << ")" << std::endl;
     std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)\n" << std::endl;
 
     boinc_init_options(&options);

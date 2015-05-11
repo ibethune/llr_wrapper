@@ -6,23 +6,18 @@ CXX = g++
 CXXFLAGS = -g \
     -m32 \
     -I$(BOINC_DIR)/include/boinc \
-    -DARCH_TRIPLET=i686-pc-linux-gnu \
     -DBITNESS=32
-
 
 LDFLAGS = -static -m32 \
     -L$(BOINC_DIR)/lib
 
-PROG = primegrid_llr_wrapper_1.00_i686-pc-linux-gnu
+PROG = primegrid_llr_wrapper_7.00_i686-pc-linux-gnu
 
-all: wrapper
+all: clean $(PROG)
 
 clean:
 	rm -f $(PROG) *.o
 
-distclean:
-	/bin/rm -f $(PROG) *.o
-
-wrapper: wrapper.o
+$(PROG): wrapper.o
 	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lpthread -lboinc_api -lboinc
 
