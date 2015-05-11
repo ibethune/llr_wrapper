@@ -10,12 +10,13 @@ The wrapper requires the following files as input:
  - called "llr.in", boinc_copy() to "llrin.txt" 
 
 * LLR binary
- - called "primegrid_llr_ARCH_TRIPLET.orig", where ARCH_TRIPLET could be x86_64-apple-darwin etc.
- - copied to "primegrid_llr_ARCH_TRIPLET"
+ - called "primegrid_llr.orig"
+ - copied to "primegrid_llr"
 
 LLR is then executed as a child process using:
 
-execvp() - "primegrid_llr_ARCH_TRIPLET -d"
+execvp() - "primegrid_llr -v" - to get the version number
+execvp() - "primegrid_llr -d" - to perform the test
 
 Periodically, poll LLR for status.  Read the FFT info and the progress string from the stdout of LLR.
 FFT info is echoed into the stderr file.
