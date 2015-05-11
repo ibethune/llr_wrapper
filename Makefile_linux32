@@ -19,5 +19,5 @@ clean:
 	rm -f $(PROG) *.o
 
 $(PROG): wrapper.o
-	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lpthread -lboinc_api -lboinc
+	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lboinc_api -lboinc -lpthread
 

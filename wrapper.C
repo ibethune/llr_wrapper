@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <sys/resource.h>
+#include <fcntl.h>
 
 #include "procinfo.h"
 #include "boinc_api.h"
