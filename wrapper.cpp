@@ -7,7 +7,7 @@
 #include <windows.h>
 #include <tchar.h>
 #include "boinc_win.h"
-#include "win_util.h" // supend_resume
+#include "win_util.h" // suspend_resume
 typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
 #else
 #include <fcntl.h>

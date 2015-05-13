@@ -1,6 +1,8 @@
 # llr_wrapper
 BOINC wrapper for LLR
 
+--- Linux/Mac wrapper ---
+
 The wrapper requires the following files as input:
 
 * Ini file (contains LLR options)
@@ -27,3 +29,32 @@ Once LLR has finished, read the results:
  - strip out any progress messages "*Bit*" and save to lresults_parsed.txt
  - convert to DOS line endings and save to lresults_parsed.txt.dos
  - Finally, boinc_copy() to "llr.out"
+
+
+
+--- Windows wrapper ---
+
+The wrapper requires the following files as input:
+
+* Ini file
+ - called "llr.ini" (set to be writeable)
+
+* LLR inut file
+ - called "llr.in"
+
+* LLR binary
+ - called "primegrid_cllr.exe"
+
+LLR is executed as a child process using:
+
+"primegrid_cllr.exe -d (LLR_ARGS) llr.in" - to perform the test
+
+
+Periodically, poll LLR for status, reading the FFT length and the progress string from LLR stdout.
+
+Once LLR has finished, read the results:
+
+* lresults.txt
+ - strip out any progress messages "*Bit*" and save to lresults_parsed.txt
+ - Finally, boinc_copy() to "llr.out"
+
