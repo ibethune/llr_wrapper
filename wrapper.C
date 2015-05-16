@@ -27,6 +27,7 @@
     #include <unistd.h>
     #include <fcntl.h>
     #include <sys/wait.h>
+    #include <fstream>
 #endif
 
 // BOINC includes
@@ -34,11 +35,7 @@
 #include "diagnostics.h"
 #include "filesys.h"
 #include "util.h"
-#ifdef _WIN32
-    // Only used by Windows for now
-    #include "error_numbers.h" 
-    #include "str_util.h"
-#endif
+#include "error_numbers.h" 
 
 #ifndef BITNESS
 #error "BITNESS must be defined e.g. 64 or 32"
@@ -180,7 +177,7 @@ int TASK::run()
     if (pid == 0) {
         // we're in the child process here
         dup2(STDERR_FILENO,STDOUT_FILENO);
-        retval = execl(app.c_str(), app.c_str(), llr_version.c_str(), NULL);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
         std::cerr << "execl failed: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }else{
@@ -246,7 +243,7 @@ int TASK::run()
         close(fd_out[0]);
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
-        retval = execl(app.c_str(), app.c_str(), llr_verbose.c_str(), NULL);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), in_file.c_str(), NULL);
         std::cerr << "execl failed: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }else{
