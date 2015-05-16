@@ -21,6 +21,3 @@ clean:
 $(PROG): wrapper.o
 	$(CXX) $(LDFLAGS) -o $(PROG) wrapper.o -lboinc_api -lboinc
 
-wrapper.o: wrapper.cpp
-	$(CXX) $(CXXFLAGS) -c -o wrapper.o wrapper.cpp
-
