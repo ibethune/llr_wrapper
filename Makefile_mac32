@@ -2,6 +2,10 @@
 BOINC_DIR ?= /Users/julieiain/Documents/pyramid/primegrid/boinc/boinc-6.7.4
 export MACOSX_DEPLOYMENT_TARGET=10.4
 
+BITS=32
+VERSION=7.00
+ARCH=i686-apple-darwin
+
 CXX = g++
 
 CXXFLAGS = -g \
@@ -9,12 +13,13 @@ CXXFLAGS = -g \
     -I$(BOINC_DIR)/lib \
     -I$(BOINC_DIR)/api \
     -I$(BOINC_DIR) \
-    -DBITNESS=32
+    -DBITNESS=$(BITS) \
+    -DWRAPPER_VERSION="$(VERSION)"
 
 LDFLAGS = -Wl,-syslibroot,/Developer/SDKs/MacOSX10.4u.sdk -arch i386 \
     -L$(BOINC_DIR)/mac_build/build/Deployment
 
-PROG = primegrid_llr_wrapper_7.00_i686-apple-darwin
+PROG = primegrid_llr_wrapper_$(VERSION)_$(ARCH)
 
 all: clean $(PROG)
 

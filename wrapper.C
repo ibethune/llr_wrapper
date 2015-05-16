@@ -41,7 +41,11 @@
 #error "BITNESS must be defined e.g. 64 or 32"
 #endif
 
-#define WRAPPER_VERSION "7.00"
+#ifndef WRAPPER_VERSION
+#error "WRAPPER_VERSION must be defined e.g. 7.00"
+#endif
+#define STR(X) STR2(X)
+#define STR2(X) #X
 
 #define POLL_PERIOD 1.0
 
@@ -475,7 +479,7 @@ int main(int argc, char** argv)
     options.handle_process_control = true;
     options.backwards_compatible_graphics = true;
 
-    std::cerr << "BOINC llr wrapper (version " << WRAPPER_VERSION << ")" << std::endl;
+    std::cerr << "BOINC llr wrapper (version " << STR(WRAPPER_VERSION) << ")" << std::endl;
     std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)" << std::endl;
 
     boinc_init_options (&options);
