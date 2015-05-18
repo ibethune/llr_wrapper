@@ -163,6 +163,8 @@ int TASK::run()
     // Wait for LLR to exit
 
     WaitForSingleObject( process_info.hProcess, INFINITE );
+    CloseHandle( process_info.hProcess );
+    CloseHandle( process_info.hThread );
 
     CHAR buf[256];
     DWORD len;
@@ -189,7 +191,7 @@ int TASK::run()
       // In the parent process
       int status;
       // Wait for LLR to exit
-      waitpid(pid, &status, WNOHANG);
+      waitpid(pid, &status, WUNTRACED);
     }
 #endif
 
