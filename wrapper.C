@@ -29,6 +29,7 @@
     #include <sys/wait.h>
     #include <fstream>
     #include <sys/resource.h>
+    #include <sys/times.h>
 #endif
 
 // BOINC includes
