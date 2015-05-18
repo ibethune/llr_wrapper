@@ -95,7 +95,6 @@ struct TASK
     void resume();
     double cpu_time();
     double read_status();
-    double wall_cpu_time;
     void poll_boinc_messages();
     void send_status_message(double checkpoint_period);
 };
@@ -237,7 +236,6 @@ int TASK::run()
       std::cerr << "Failed to create pipe" << std::endl;
       return 250; // 250: Failed to create pipe
     }
-    wall_cpu_time = 0;
 
     pid = fork();
     if (pid == -1) {
@@ -278,7 +276,6 @@ bool TASK::poll(int& status)
 #else
     int wpid;
     struct rusage ru;
-    if (!app_suspended) wall_cpu_time += POLL_PERIOD;
     wpid = wait4(pid, &status, WNOHANG, &ru);
     if (wpid) return true;
 #endif
@@ -351,7 +348,99 @@ void TASK::poll_boinc_messages()
 
 double TASK::cpu_time()
 {
-    return wall_cpu_time;
+#ifdef _WIN32
+    double cpu;
+    OSVERSIONINFOEX osvi;
+    SYSTEM_INFO si;
+    PGNSI pGNSI;
+    BOOL bOsVersionInfoEx;
+
+    ZeroMemory(&si, sizeof(SYSTEM_INFO));
+    ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+
+    // Try calling GetVersionEx using the OSVERSIONINFOEX structure.
+    // If that fails, try using the OSVERSIONINFO structure.
+    osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+    if( !(bOsVersionInfoEx = GetVersionEx ((OSVERSIONINFO *) &osvi)) ) {
+        osvi.dwOSVersionInfoSize = sizeof (OSVERSIONINFO);
+        if (! GetVersionEx ( (OSVERSIONINFO *) &osvi) )
+            return FALSE;
+    }
+
+    // Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
+    pGNSI = (PGNSI) GetProcAddress(
+        GetModuleHandle(TEXT("kernel32.dll")),
+        "GetNativeSystemInfo");
+    if (NULL != pGNSI) {
+        pGNSI(&si);
+    } else {
+        GetSystemInfo(&si);
+    }
+
+    switch (osvi.dwPlatformId) {
+        case VER_PLATFORM_WIN32_NT:
+            FILETIME creation_time, exit_time, kernel_time, user_time;
+            ULARGE_INTEGER tKernel, tUser;
+            LONGLONG totTime;
+
+            GetProcessTimes(
+                pid_handle, &creation_time, &exit_time, &kernel_time, &user_time
+            );
+
+            tKernel.LowPart = kernel_time.dwLowDateTime;
+            tKernel.HighPart = kernel_time.dwHighDateTime;
+            tUser.LowPart = user_time.dwLowDateTime;
+            tUser.HighPart = user_time.dwHighDateTime;
+            totTime = tKernel.QuadPart + tUser.QuadPart;
+
+            cpu = totTime / 1.e7;
+            return cpu;
+            break;
+        case VER_PLATFORM_WIN32_WINDOWS:
+            cpu = 3600; // Better than nothing...
+            return cpu;
+            break;
+    }
+    return 0;
+#elif defined(__linux__)
+    struct tms t;
+    FILE *f;
+    char fn[32];
+    unsigned long ut, st;
+    clock_t ticks = 0;
+
+    /* Add CPU times used by parent and completed children */
+    if (times(&t) != (clock_t)-1)
+      ticks += (t.tms_utime + t.tms_stime + t.tms_cutime + t.tms_cstime);
+
+    /* Add CPU times used by incomplete children */
+    sprintf(fn,"/proc/%d/stat",pid);
+    if ((f = fopen(fn,"r")) != NULL)
+    {
+      if (fscanf(f,"%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%lu%lu",&ut,&st)==2)
+        ticks += (ut + st);
+      fclose(f);
+    }
+
+    /* CLK_TCK should be defined in <sys/times.h>, but it goes missing when
+       compiling C++. */
+#ifndef CLK_TCK
+# define CLK_TCK ((clock_t)sysconf(_SC_CLK_TCK))
+#endif
+
+    return (double)ticks/CLK_TCK;
+#else
+    static double t=0, cpu;
+    if (t) {
+        double now = dtime();
+        cpu += now-t;
+        t = now;
+    } else {
+        t = dtime();
+    }
+    return cpu;
+#endif
 }
 
 
