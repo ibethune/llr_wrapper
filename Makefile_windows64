@@ -14,7 +14,7 @@ CXXFLAGS = -g \
     -DBITNESS=$(BITS) \
     -DWRAPPER_VERSION="$(VERSION)"
 
-LDFLAGS = -L$(BOINC_INSTALL_DIR)/lib 
+LDFLAGS = -L$(BOINC_INSTALL_DIR)/lib -static
 
 PROG = primegrid_llr_wrapper_$(VERSION)_$(ARCH).exe
 
