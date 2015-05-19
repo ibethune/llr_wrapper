@@ -6,7 +6,7 @@ The wrapper requires the following files as input:
 * Ini file
  - called "llr.ini" (set to be writeable)
 
-* LLR inut file
+* LLR input file
  - called "llr.in"
 
 * LLR binary
@@ -15,11 +15,11 @@ The wrapper requires the following files as input:
 
 LLR is executed as a child process using (Linux/Mac):
 
-execl() - "primegrid_llr -v" - to get the version number
-execl() - "primegrid_llr -d llr.in" - to perform the test
+* execl() - "primegrid_llr -v" - to get the version number
+* execl() - "primegrid_llr -d llr.in" - to perform the test
 
-CreateProcess() "primegrid_cllr.exe -v" - to get the version number
-CreateProcess() "primegrid_cllr.exe -d llr.in" - to perform the test
+* CreateProcess() "primegrid_cllr.exe -v" - to get the version number
+* CreateProcess() "primegrid_cllr.exe -d llr.in" - to perform the test
 
 Periodically, poll LLR for status.  Read the FFT info and the progress string from the stdout of LLR.
 FFT info is echoed into the stderr file.
