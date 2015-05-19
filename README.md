@@ -18,6 +18,8 @@ LLR is executed as a child process using (Linux/Mac):
 * execl() - "primegrid_llr -v" - to get the version number
 * execl() - "primegrid_llr -d llr.in" - to perform the test
 
+and on Windows:
+
 * CreateProcess() "primegrid_cllr.exe -v" - to get the version number
 * CreateProcess() "primegrid_cllr.exe -d llr.in" - to perform the test
 
