@@ -3,7 +3,7 @@ BOINC_DIR ?= ../boinc_6.12.43
 BOINC_INSTALL_DIR ?= ../boinc_6.12.43_64
 
 BITS=64
-VERSION=7.00beta
+VERSION=7.00
 ARCH=windows_x86_64
 
 CXX = g++

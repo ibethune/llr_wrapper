@@ -3,7 +3,7 @@ BOINC_DIR ?= /Users/julieiain/Documents/pyramid/primegrid/boinc/boinc-6.7.4
 export MACOSX_DEPLOYMENT_TARGET=10.4
 
 BITS=32
-VERSION=7.00beta
+VERSION=7.00
 ARCH=i686-apple-darwin
 
 CXX = g++
