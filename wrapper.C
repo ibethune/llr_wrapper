@@ -91,8 +91,9 @@ struct TASK
 
     bool poll(int& status);
     int run();
+    void terminate();
     void kill();
-    void stop();
+    void suspend();
     void resume();
     double cpu_time();
     double read_status();
@@ -294,7 +295,16 @@ void TASK::kill()
 #endif
 }
 
-void TASK::stop()
+void TASK::terminate()
+{
+#ifdef _WIN32
+    TerminateProcess(pid_handle, -1);
+#else
+    ::kill(pid, SIGTERM);
+#endif
+}
+
+void TASK::suspend()
 {
 #ifdef _WIN32
     suspend_or_resume_threads(pid, 0, false);
@@ -318,12 +328,12 @@ void TASK::poll_boinc_messages()
     boinc_get_status(&status);
     if (status.no_heartbeat)
     {
-        kill();
+        terminate();
         exit(0);
     }
     if (status.quit_request)
     {
-        kill();
+        terminate();
         exit(0);
     }
     if (status.abort_request)
@@ -335,7 +345,7 @@ void TASK::poll_boinc_messages()
     {
         if (!app_suspended)
         {
-            stop();
+            suspend();
             app_suspended = true;
         }
     }
