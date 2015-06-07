@@ -291,6 +291,7 @@ void TASK::kill()
 #ifdef _WIN32
     TerminateProcess(pid_handle, -1);
 #else
+    // Send a KILL, LLR terminates ASAP
     ::kill(pid, SIGKILL);
 #endif
 }
@@ -300,7 +301,10 @@ void TASK::terminate()
 #ifdef _WIN32
     TerminateProcess(pid_handle, -1);
 #else
+    // Send a TERM, then wait until LLR checkpoints and terminates
     ::kill(pid, SIGTERM);
+    int status;
+    waitpid(pid, &status, WUNTRACED);
 #endif
 }
 
