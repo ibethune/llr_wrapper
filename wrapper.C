@@ -124,7 +124,8 @@ int TASK::run()
     sa.bInheritHandle = TRUE;
 
     // Create a pipe to read from the child process
-    if (!CreatePipe(&hOutputReadTmp,&hOutputWrite,&sa,0)) {
+    if (!CreatePipe(&hOutputReadTmp,&hOutputWrite,&sa,0))
+    {
         std::cerr << "Failed to create pipe" << std::endl;
         return 250; // 250: Failed to create pipe
     }
@@ -132,7 +133,8 @@ int TASK::run()
                            GetCurrentProcess(),
                            &hOutputRead, // Address of new handle.
                            0,FALSE, // Make it uninheritable.
-                           DUPLICATE_SAME_ACCESS)) {
+                           DUPLICATE_SAME_ACCESS))
+    {
         std::cerr << "Failed to DuplicateHandle()" << std::endl;
         return 251;
     }
@@ -173,26 +175,43 @@ int TASK::run()
     {
         buf[len] = '\0';
         std::cerr << buf << std::endl; 
-    }else{
+    }
+    else
+    {
         std::cerr << "Could not determine LLR version number, continuing..." << std::endl;
     }
 #else
     int retval;
     pid = fork();
-    if (pid == -1) {
+    if (pid == -1)
+    {
         boinc_finish(ERR_FORK);
     }
-    if (pid == 0) {
+    if (pid == 0)
+    {
         // we're in the child process here
         dup2(STDERR_FILENO,STDOUT_FILENO);
         retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
+
+        // If BOINC has not finished with the file,
+        // wait 5 seconds then try again,
+        // A second failure is fatal
+        if (errno == ETXTBSY)
+        {
+            std::cerr << "File busy, waiting 5s to retry:" << llr_app_name << std::endl;
+            boinc_sleep(5.0);
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
+        }
+        
         std::cerr << "execl failed: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
-    }else{
-      // In the parent process
-      int status;
-      // Wait for LLR to exit
-      waitpid(pid, &status, WUNTRACED);
+    }
+    else
+    {
+        // In the parent process
+        int status;
+        // Wait for LLR to exit
+        waitpid(pid, &status, WUNTRACED);
     }
 #endif
 
@@ -236,29 +255,34 @@ int TASK::run()
 #else
     int fd_out[2];
 
-    if (pipe(fd_out) < 0) {
-      std::cerr << "Failed to create pipe" << std::endl;
-      return 250; // 250: Failed to create pipe
+    if (pipe(fd_out) < 0)
+    {
+        std::cerr << "Failed to create pipe" << std::endl;
+        return 250; // 250: Failed to create pipe
     }
 
     pid = fork();
-    if (pid == -1) {
+    if (pid == -1)
+    {
         boinc_finish(ERR_FORK);
     }
-    if (pid == 0) {
-    // we're in the child process here
+    if (pid == 0)
+    {
+        // we're in the child process here
         close(fd_out[0]);
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
         retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), in_file.c_str(), NULL);
         std::cerr << "execl failed: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
-    }else{
-      // In the parent process
-      close(fd_out[1]);
-      /* Prevent parent read() blocking on child output pipe. */
-      fcntl(fd_out[0],F_SETFL,fcntl(fd_out[0],F_GETFL)|O_NONBLOCK);
-      fdOutputRead = fd_out[0];
+    }
+    else
+    {
+        // In the parent process
+        close(fd_out[1]);
+        /* Prevent parent read() blocking on child output pipe. */
+        fcntl(fd_out[0],F_SETFL,fcntl(fd_out[0],F_GETFL)|O_NONBLOCK);
+        fdOutputRead = fd_out[0];
     }
 
 #endif
