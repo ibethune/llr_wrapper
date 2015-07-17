@@ -50,6 +50,7 @@
 #define STR2(X) #X
 
 #define POLL_PERIOD 1.0
+#define TRICKLE_PERIOD 300.0
 
 // The name of the executable that does the actual work:
 #ifdef _WIN32
@@ -71,6 +72,7 @@ struct TASK
     double old_progress;
     double old_time;
     double old_checkpoint_time;
+    double last_trickle;
     bool bGotFFT;
     bool app_suspended;
 #ifdef _WIN32
@@ -84,6 +86,7 @@ struct TASK
 
     TASK() : progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
+             last_trickle(0.0),
 #ifdef _WIN32
              pid_handle(0),
 #endif
@@ -99,6 +102,7 @@ struct TASK
     double read_status();
     void poll_boinc_messages();
     void send_status_message(double checkpoint_period);
+    void trickle_up_progress();
 };
 
 int TASK::run()
@@ -570,6 +574,29 @@ void TASK::send_status_message(double checkpoint_period)
         old_checkpoint_time,
         progress
     );
+}
+
+void TASK::trickle_up_progress()
+{
+    double now = cpu_time() + old_time; // Total CPU time since WU started
+    if (now - last_trickle > TRICKLE_PERIOD)
+    {
+        // Send progress via a trickle-up message
+        last_trickle = now;
+
+        char msg[1024];
+        sprintf(msg, "<trickle_up>\n"
+                     "   <progress>%f</progress>\n"
+                     "   <cputime>%f</cputime>\n"
+                     "</trickle_up\n",
+                     progress, now );
+        int ret = boinc_send_trickle_up("llr_progress", msg);
+
+        if (!ret)
+        {
+           std::cerr << "Trickle-up failed with error code:" << ret << std::endl;
+        }
+    }
 }
 
 #ifndef _WIN32
