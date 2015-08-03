@@ -50,7 +50,7 @@
 #define STR2(X) #X
 
 #define POLL_PERIOD 1.0
-#define TRICKLE_PERIOD 300.0
+#define TRICKLE_PERIOD 30.0
 
 // The name of the executable that does the actual work:
 #ifdef _WIN32
@@ -578,7 +578,7 @@ void TASK::send_status_message(double checkpoint_period)
 
 void TASK::trickle_up_progress()
 {
-    double now = cpu_time() + old_time; // Total CPU time since WU started
+    double now = cpu_time() + old_time; // Total CPU time since WU started ??
     if (now - last_trickle > TRICKLE_PERIOD)
     {
         // Send progress via a trickle-up message
@@ -588,11 +588,12 @@ void TASK::trickle_up_progress()
         sprintf(msg, "<trickle_up>\n"
                      "   <progress>%f</progress>\n"
                      "   <cputime>%f</cputime>\n"
-                     "</trickle_up\n",
+                     "</trickle_up>\n",
                      progress, now );
         int ret = boinc_send_trickle_up("llr_progress", msg);
+        std::cerr << "Sent trickle up message:" << std::endl << msg << std::endl;
 
-        if (!ret)
+        if (ret)
         {
            std::cerr << "Trickle-up failed with error code:" << ret << std::endl;
         }
@@ -676,6 +677,7 @@ int main(int argc, char** argv)
         }
         t.poll_boinc_messages();
         t.send_status_message(uc_aid.checkpoint_period);
+        t.trickle_up_progress();
         boinc_sleep(POLL_PERIOD);
     }
 
