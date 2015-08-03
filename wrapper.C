@@ -636,6 +636,7 @@ int main(int argc, char** argv)
     options.main_program = true;
     options.check_heartbeat = true;
     options.handle_process_control = true;
+    options.handle_trickle_ups = true;
 
     std::cerr << "BOINC llr wrapper (version " << STR(WRAPPER_VERSION) << ")" << std::endl;
     std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)" << std::endl;
