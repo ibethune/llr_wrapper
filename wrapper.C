@@ -193,17 +193,14 @@ int TASK::run()
         dup2(STDERR_FILENO,STDOUT_FILENO);
         retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
 
-        // If BOINC has not finished with the file,
+        // If execl failed for some reason
         // wait 5 seconds then try again,
         // A second failure is fatal
-        if (errno == ETXTBSY)
-        {
-            std::cerr << "File busy, waiting 5s to retry:" << llr_app_name << std::endl;
-            boinc_sleep(5.0);
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
-        }
+        std::cerr << "execl failed once: " << strerror(errno) << std::endl;
+        boinc_sleep(5.0);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
         
-        std::cerr << "execl failed: " << strerror(errno) << std::endl;
+        std::cerr << "execl failed twice: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }
     else
@@ -273,7 +270,15 @@ int TASK::run()
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
         retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), in_file.c_str(), NULL);
-        std::cerr << "execl failed: " << strerror(errno) << std::endl;
+
+        // If execl failed for some reason
+        // wait 5 seconds then try again,
+        // A second failure is fatal
+        std::cerr << "execl failed once: " << strerror(errno) << std::endl;
+        boinc_sleep(5.0);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), NULL);
+
+        std::cerr << "execl failed twice: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }
     else
