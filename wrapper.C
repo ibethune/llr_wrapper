@@ -559,6 +559,11 @@ void TASK::send_status_message(double checkpoint_period)
 {
     double new_checkpoint_time = old_checkpoint_time;
     double cputime = cpu_time();
+    std::cerr << "cpu_time()=" << cputime << std::endl;
+    double boinc_cpu_time;
+    boinc_wu_cpu_time(boinc_cpu_time);
+    std::cerr << "boinc_wu_cpu_time()=" << boinc_cpu_time << std::endl;
+    std::cerr << "boinc_elapsed_time()=" << boinc_elapsed_time() << std::endl;
 
     old_progress = progress;
     progress = read_status();
@@ -650,7 +655,7 @@ int main(int argc, char** argv)
 
     // Start application
     TASK t;
-    boinc_wu_cpu_time(t.old_time);
+    std::cerr << "Starting, previous CPU time=" << t.old_time << std::endl;
     t.old_checkpoint_time = t.old_time;
 
     retval = t.run();
