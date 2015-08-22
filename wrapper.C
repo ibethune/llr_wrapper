@@ -50,7 +50,8 @@
 #define STR2(X) #X
 
 #define POLL_PERIOD 1.0
-#define TRICKLE_PERIOD 30.0
+#define TRICKLE_PERIOD 86400.0 // 24 hours
+#define TRICKLE_FILE "trickle.dat"
 
 // The name of the executable that does the actual work:
 #ifdef _WIN32
@@ -72,7 +73,7 @@ struct TASK
     double old_progress;
     double old_time;
     double old_checkpoint_time;
-    double last_trickle;
+    time_t last_trickle;
     bool bGotFFT;
     bool app_suspended;
 #ifdef _WIN32
@@ -86,7 +87,7 @@ struct TASK
 
     TASK() : progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
-             last_trickle(0.0),
+             last_trickle(0),
 #ifdef _WIN32
              pid_handle(0),
 #endif
@@ -559,11 +560,6 @@ void TASK::send_status_message(double checkpoint_period)
 {
     double new_checkpoint_time = old_checkpoint_time;
     double cputime = cpu_time();
-    std::cerr << "cpu_time()=" << cputime << std::endl;
-    double boinc_cpu_time;
-    boinc_wu_cpu_time(boinc_cpu_time);
-    std::cerr << "boinc_wu_cpu_time()=" << boinc_cpu_time << std::endl;
-    std::cerr << "boinc_elapsed_time()=" << boinc_elapsed_time() << std::endl;
 
     old_progress = progress;
     progress = read_status();
@@ -579,29 +575,42 @@ void TASK::send_status_message(double checkpoint_period)
         old_checkpoint_time,
         progress
     );
+    boinc_fraction_done(progress);
 }
 
 void TASK::trickle_up_progress()
 {
-    double now = cpu_time() + old_time; // Total CPU time since WU started ??
-    if (now - last_trickle > TRICKLE_PERIOD)
+    time_t now = time(NULL);
+
+    // If the time since the last trickle is long enough, and we have valid progress to report
+    if (difftime(now, last_trickle) > TRICKLE_PERIOD && progress != 0.0)
     {
         // Send progress via a trickle-up message
         last_trickle = now;
 
-        char msg[1024];
-        sprintf(msg, "<trickle_up>\n"
-                     "   <progress>%f</progress>\n"
-                     "   <cputime>%f</cputime>\n"
-                     "</trickle_up>\n",
-                     progress, now );
-        int ret = boinc_send_trickle_up("llr_progress", msg);
-        std::cerr << "Sent trickle up message:" << std::endl << msg << std::endl;
+        double progress = boinc_get_fraction_done();
+        double cpu;
+        boinc_wu_cpu_time(cpu); // Only from previous runs, since we don't checkpoint
+        cpu += cpu_time();
+        APP_INIT_DATA init_data;
+        boinc_get_init_data(init_data);
+        double run = boinc_elapsed_time() + init_data.starting_elapsed_time;
 
-        if (ret)
-        {
-           std::cerr << "Trickle-up failed with error code:" << ret << std::endl;
-        }
+        char msg[512];
+        sprintf(msg, "<trickle_up>\n"
+                    "   <progress>%f</progress>\n"
+                    "   <cputime>%f</cputime>\n"
+                    "   <runtime>%f</runtime>\n"
+                    "</trickle_up>\n",
+                     progress, cpu, run  );
+        char variety[64];
+        sprintf(variety, "llr_progress");
+        int ret = boinc_send_trickle_up(variety, msg);
+
+        // Store the last_trickle timestamp to a file, so we can recover it when we restart.
+        FILE *f = boinc_fopen(TRICKLE_FILE, "w"); // overwrite
+        fwrite(&last_trickle, sizeof(time_t), 1, f);
+        fclose(f);
     }
 }
 
@@ -655,7 +664,7 @@ int main(int argc, char** argv)
 
     // Start application
     TASK t;
-    std::cerr << "Starting, previous CPU time=" << t.old_time << std::endl;
+    boinc_wu_cpu_time(t.old_time);
     t.old_checkpoint_time = t.old_time;
 
     retval = t.run();
@@ -663,6 +672,18 @@ int main(int argc, char** argv)
     {
         std::cerr << "Can't run app: " << llr_app_name << " (Error code: " << retval << ")" << std::endl;
         boinc_finish(retval);
+    }
+
+    // Attempt to read the last trickle timestamp from file
+    FILE *f = boinc_fopen(TRICKLE_FILE, "r");
+    if (f)
+    {
+        time_t last_trickle_read;
+        if (fread(&last_trickle_read, sizeof(time_t), 1, f) == 1)
+        {
+            t.last_trickle = last_trickle_read;
+        }
+        fclose(f);
     }
 
     // Poll for application status
