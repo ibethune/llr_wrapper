@@ -1,5 +1,5 @@
 # Change the following to match your installation
-BOINC_DIR ?= /Users/julieiain/Documents/pyramid/primegrid/boinc/boinc-6.7.4
+BOINC_DIR ?= ../boinc_707
 export MACOSX_DEPLOYMENT_TARGET=10.4
 
 BITS=32
