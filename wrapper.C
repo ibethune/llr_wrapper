@@ -50,6 +50,8 @@
 #define STR2(X) #X
 
 #define POLL_PERIOD 1.0
+#define TRICKLE_PERIOD 86400.0 // 24 hours
+#define TRICKLE_FILE "trickle.dat"
 
 // The name of the executable that does the actual work:
 #ifdef _WIN32
@@ -71,6 +73,7 @@ struct TASK
     double old_progress;
     double old_time;
     double old_checkpoint_time;
+    time_t last_trickle;
     bool bGotFFT;
     bool app_suspended;
 #ifdef _WIN32
@@ -84,6 +87,7 @@ struct TASK
 
     TASK() : progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
+             last_trickle(0),
 #ifdef _WIN32
              pid_handle(0),
 #endif
@@ -99,6 +103,7 @@ struct TASK
     double read_status();
     void poll_boinc_messages();
     void send_status_message(double checkpoint_period);
+    void trickle_up_progress();
 };
 
 int TASK::run()
@@ -575,6 +580,43 @@ void TASK::send_status_message(double checkpoint_period)
         old_checkpoint_time,
         progress
     );
+    boinc_fraction_done(progress);
+}
+
+void TASK::trickle_up_progress()
+{
+    time_t now = time(NULL);
+
+    // If the time since the last trickle is long enough, and we have valid progress to report
+    if (difftime(now, last_trickle) > TRICKLE_PERIOD && progress != 0.0)
+    {
+        // Send progress via a trickle-up message
+        last_trickle = now;
+
+        double progress = boinc_get_fraction_done();
+        double cpu;
+        boinc_wu_cpu_time(cpu); // Only from previous runs, since we don't checkpoint
+        cpu += cpu_time();
+        APP_INIT_DATA init_data;
+        boinc_get_init_data(init_data);
+        double run = boinc_elapsed_time() + init_data.starting_elapsed_time;
+
+        char msg[512];
+        sprintf(msg, "<trickle_up>\n"
+                    "   <progress>%f</progress>\n"
+                    "   <cputime>%f</cputime>\n"
+                    "   <runtime>%f</runtime>\n"
+                    "</trickle_up>\n",
+                     progress, cpu, run  );
+        char variety[64];
+        sprintf(variety, "llr_progress");
+        int ret = boinc_send_trickle_up(variety, msg);
+
+        // Store the last_trickle timestamp to a file, so we can recover it when we restart.
+        FILE *f = boinc_fopen(TRICKLE_FILE, "w"); // overwrite
+        fwrite(&last_trickle, sizeof(time_t), 1, f);
+        fclose(f);
+    }
 }
 
 #ifndef _WIN32
@@ -613,6 +655,7 @@ int main(int argc, char** argv)
     options.main_program = true;
     options.check_heartbeat = true;
     options.handle_process_control = true;
+    options.handle_trickle_ups = true;
 
     std::cerr << "BOINC llr wrapper (version " << STR(WRAPPER_VERSION) << ")" << std::endl;
     std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)" << std::endl;
@@ -636,6 +679,18 @@ int main(int argc, char** argv)
         boinc_finish(retval);
     }
 
+    // Attempt to read the last trickle timestamp from file
+    FILE *f = boinc_fopen(TRICKLE_FILE, "r");
+    if (f)
+    {
+        time_t last_trickle_read;
+        if (fread(&last_trickle_read, sizeof(time_t), 1, f) == 1)
+        {
+            t.last_trickle = last_trickle_read;
+        }
+        fclose(f);
+    }
+
     // Poll for application status
     int status;
     for(;;)
@@ -654,6 +709,7 @@ int main(int argc, char** argv)
         }
         t.poll_boinc_messages();
         t.send_status_message(uc_aid.checkpoint_period);
+        t.trickle_up_progress();
         boinc_sleep(POLL_PERIOD);
     }
 
