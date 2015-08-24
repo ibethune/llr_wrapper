@@ -87,7 +87,7 @@ struct TASK
 
     TASK() : progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
-             last_trickle(0),
+             last_trickle(time(NULL)),
 #ifdef _WIN32
              pid_handle(0),
 #endif
