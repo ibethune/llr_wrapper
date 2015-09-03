@@ -644,6 +644,16 @@ int main(int argc, char** argv)
     BOINC_OPTIONS options;
     int retval;
 
+#ifndef _WIN32
+    // Close good amount of possibly opened (inherited) handles except standard 0-2
+    // (stdin, stdout, stderr) to avoid handle-inheritance-on-exec bug in older Boinc clients
+    // https://github.com/BOINC/boinc/issues/1388
+    for (int i = 3; i < 100; i++)
+    {
+        close(i);
+    }
+#endif
+
     boinc_init_diagnostics(
         BOINC_DIAG_DUMPCALLSTACKENABLED |
         BOINC_DIAG_HEAPCHECKENABLED |
