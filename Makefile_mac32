@@ -3,7 +3,7 @@ BOINC_DIR ?= ../boinc_707
 export MACOSX_DEPLOYMENT_TARGET=10.4
 
 BITS=32
-VERSION=7.03
+VERSION=7.05beta
 ARCH=i686-apple-darwin
 
 CXX = g++
