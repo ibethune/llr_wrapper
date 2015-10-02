@@ -614,8 +614,11 @@ void TASK::trickle_up_progress()
 
         // Store the last_trickle timestamp to a file, so we can recover it when we restart.
         FILE *f = boinc_fopen(TRICKLE_FILE, "wb"); // overwrite
-        fwrite(&last_trickle, sizeof(time_t), 1, f);
-        fclose(f);
+        if (f)
+        {
+            fwrite(&last_trickle, sizeof(time_t), 1, f);
+            fclose(f);
+        }
     }
 }
 
@@ -690,6 +693,7 @@ int main(int argc, char** argv)
     }
 
     // Attempt to read the last trickle timestamp from file
+    bool got_trickle = false;
     FILE *f = boinc_fopen(TRICKLE_FILE, "rb");
     if (f)
     {
@@ -699,6 +703,17 @@ int main(int argc, char** argv)
             t.last_trickle = last_trickle_read;
         }
         fclose(f);
+    }
+
+    // If we couldn't read a trickle timestamp, try to create a new one
+    if (!got_trickle)
+    {
+        f = boinc_fopen(TRICKLE_FILE, "wb"); // overwrite
+        if (f)
+        {
+            fwrite(&last_trickle, sizeof(time_t), 1, f);
+            fclose(f);
+        }
     }
 
     // Poll for application status
