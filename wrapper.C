@@ -711,7 +711,7 @@ int main(int argc, char** argv)
         f = boinc_fopen(TRICKLE_FILE, "wb"); // overwrite
         if (f)
         {
-            fwrite(&last_trickle, sizeof(time_t), 1, f);
+            fwrite(&(t.last_trickle), sizeof(time_t), 1, f);
             fclose(f);
         }
     }
