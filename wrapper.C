@@ -701,6 +701,7 @@ int main(int argc, char** argv)
         if (fread(&last_trickle_read, sizeof(time_t), 1, f) == 1)
         {
             t.last_trickle = last_trickle_read;
+            got_trickle = true;
         }
         fclose(f);
     }
