@@ -38,6 +38,7 @@
 #include "filesys.h"
 #include "util.h"
 #include "error_numbers.h" 
+#include "version.h" 
 
 #ifndef BITNESS
 #error "BITNESS must be defined e.g. 64 or 32"
@@ -66,6 +67,11 @@ const std::string in_file_name = "llr.in";
 const std::string out_file_name = "llr.out";
 const std::string llr_verbose = "-d";
 const std::string llr_version = "-v";
+const std::string llr_results = "lresults.txt";
+const std::string llr_results_parsed = "lresults_parsed.txt";
+#ifndef _WIN32
+const std::string llr_results_parsed_dos = "lresults_parsed.txt.dos";
+#endif
 
 struct TASK
 {
@@ -668,7 +674,9 @@ int main(int argc, char** argv)
     options.main_program = true;
     options.check_heartbeat = true;
     options.handle_process_control = true;
+#if BOINC_MAJOR_VERSION < 7 || (BOINC_MAJOR_VERSION == 7 && BOINC_MINOR_VERSION < 5)
     options.handle_trickle_ups = true;
+#endif
 
     std::cerr << "BOINC llr wrapper (version " << STR(WRAPPER_VERSION) << ")" << std::endl;
     std::cerr << "Using Jean Penne's llr (" << BITNESS << " bit)" << std::endl;
@@ -746,8 +754,8 @@ int main(int argc, char** argv)
     std::ifstream FR; // Read
     std::ofstream FW; // Write
     int iCount = 0;
-    FR.open("lresults.txt");
-    FW.open("lresults_parsed.txt");
+    FR.open(llr_results.c_str());
+    FW.open(llr_results_parsed.c_str());
     while ((FR.is_open()) && (!FR.eof())) {
         FR.getline(cLine, 256);
         stri = cLine;
@@ -763,22 +771,33 @@ int main(int argc, char** argv)
 
     // Find final output file
     std::string out_file;
-    boinc_resolve_filename_s(out_file_name.c_str(), out_file);
+    retval = boinc_resolve_filename_s(out_file_name.c_str(), out_file);
 
-    //Convert line-endings:
+    std::string llr_results_file;
 #ifndef __WIN32
-    if (!unix2dos("lresults_parsed.txt", "lresults_parsed.txt.dos"))
+    //Convert line-endings:
+    if (!unix2dos(llr_results_parsed.c_str(), llr_results_parsed_dos.c_str()))
     {
         std::cerr << "failed to convert line endings!" << std::endl;
         boinc_finish(-1);
         return 1;
     }
-    // Save result file
-    boinc_copy("lresults_parsed.txt.dos", out_file.c_str());
+    llr_results_file = llr_results_parsed_dos;
 #else
-    // Save result file$
-    boinc_copy("lresults_parsed.txt", out_file.c_str());
+    llr_results_file = llr_results_parsed;
 #endif
+
+    // Save result file
+    int retries = 5;
+    do {
+       retval = boinc_copy(llr_results_file.c_str(), out_file.c_str());
+       retries--;
+       if (retval != 0){
+          std::cerr << "boinc_copy() failed (Error code: " << retval << ")" << std::endl;
+          std::cerr << "Sleeping 10s then retry..." << std::endl;
+          boinc_sleep(10.0);
+       }
+    } while (retval != 0 && retries > 0);
 
     // All done
     boinc_finish(status);

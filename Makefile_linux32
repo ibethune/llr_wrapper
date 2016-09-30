@@ -2,7 +2,7 @@
 BOINC_DIR ?= ../boinc_32_707/
 
 BITS=32
-VERSION=7.05
+VERSION=7.06-dev
 ARCH=i686-pc-linux-gnu
 
 CXX = g++
