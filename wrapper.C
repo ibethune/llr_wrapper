@@ -54,6 +54,14 @@
 #define TRICKLE_PERIOD 86400.0 // 24 hours
 #define TRICKLE_FILE "trickle.dat"
 
+#define TEST_TYPE_MAX_LENGTH 9
+#define TEST_TYPE_PRP "PRP"
+#define TEST_TYPE_PRIMALITY "Primality"
+
+#define ERR_VERSION_CHECK -99
+
+#define LINE_LENGTH 80
+
 // The name of the executable that does the actual work:
 #ifdef _WIN32
     const std::string llr_app_name = "primegrid_cllr.exe";
@@ -62,11 +70,13 @@
 #endif
 
 // File names and arguments
-const std::string ini_file_name = "llr.ini";
-const std::string in_file_name = "llr.in";
+const std::string llr_ini_file_name = "llr.ini";
+const std::string llr_in_file_name = "llr.in";
+const std::string wrapper_in_file_name = "wrapper.in";
 const std::string out_file_name = "llr.out";
 const std::string llr_verbose = "-d";
-const std::string llr_version = "-v";
+const std::string llr_print_version = "-v";
+const std::string llr_forcePRP = "-oForcePRP=1";
 const std::string llr_results = "lresults.txt";
 const std::string llr_results_parsed = "lresults_parsed.txt";
 #ifndef _WIN32
@@ -114,16 +124,97 @@ struct TASK
 
 int TASK::run()
 {
+    int retval;
+    bool forcePRP = false;
+
+    // First we check for a wrapper input file
+
+    std::string wrapper_in_file;
+    boinc_resolve_filename_s(wrapper_in_file_name.c_str(), wrapper_in_file);
+
+    int llr_version_req = 0, llr_major_req = 0, llr_minor_req = 0;
+
+    FILE *w_in = boinc_fopen(wrapper_in_file.c_str(), "r");
+    if (w_in)
+    {
+        char line[LINE_LENGTH], test_type[TEST_TYPE_MAX_LENGTH+1];
+        int wrapper_major_req, wrapper_minor_req;
+
+        std::cerr << "A " << wrapper_in_file_name << " file was found" << std::endl;
+        // Read the control line from the wrapper input
+        if (fgets(line, LINE_LENGTH, w_in) != NULL &&
+            sscanf(line,"%d.%d %d.%d.%d %s", &wrapper_major_req, &wrapper_minor_req, &llr_version_req, &llr_major_req, &llr_minor_req, test_type) == 6)
+        {
+           std::cerr << "Req wrapper version: " << wrapper_major_req << "." << wrapper_minor_req << std::endl;
+           int wrapper_major, wrapper_minor;
+           if (sscanf(STR(WRAPPER_VERSION),"%d.%d", &wrapper_major, &wrapper_minor) == 2)
+           {
+               std::cerr << "Found wrapper version: " << wrapper_major << "." << wrapper_minor << std::endl;
+               if (wrapper_major_req > wrapper_major || (wrapper_major_req == wrapper_major && wrapper_minor_req > wrapper_minor))
+               {
+                   std::cerr << "A newer version of the LLR wrapper is required!" << std::endl;
+                   fclose(w_in);
+                   return ERR_VERSION_CHECK;
+               }
+           }
+           else
+           {
+               std::cerr << "Failed to determine the wrapper version" << std::endl;
+               fclose(w_in);
+               return ERR_VERSION_CHECK;
+           }
+
+           std::cerr << "Test type: " << test_type << std::endl;
+           if (strncmp(test_type, TEST_TYPE_PRP, TEST_TYPE_MAX_LENGTH) == 0)
+           {
+              std::cerr << "PRP test requested" << std::endl;
+              forcePRP = true;
+           }
+           else if (strncmp(test_type, TEST_TYPE_PRIMALITY, TEST_TYPE_MAX_LENGTH) == 0)
+           {
+              std::cerr << "Primality test requested" << std::endl;
+           }
+           else
+           {
+              std::cerr << "Could not parse test type, proceeding with a primality test..." << std::endl;
+           }
+        }
+        else
+        {
+           std::cerr << "Error reading from " << wrapper_in_file_name << std::endl;
+           fclose(w_in);
+           return ERR_READ;
+        }
+
+        // Copy the following two lines to the LLR input file
+        FILE *l_in = boinc_fopen(llr_in_file_name.c_str(), "w");
+
+        fgets(line, sizeof(line),w_in);
+        fputs(line, l_in);
+        fgets(line, sizeof(line),w_in);
+        fputs(line, l_in);
+
+        fclose(l_in);
+        fclose(w_in);
+    }
+    else
+    {
+        std::cerr << "No " << wrapper_in_file_name << " file was found, continue with legacy behaviour" << std::endl;
+    }
+
     // Run LLR to get the version number
+
+    char buf[256];
+    int len;
 
 #ifdef _WIN32
 
-    // llr.ini MUST  be writeable, so explicitely remove the read-only bit
+    // llr.ini MUST be writeable, so explicitly remove the read-only bit
     // a read-only llr.ini might be the cause of the "3 second error"
-    if (SetFileAttributes("llr.ini", FILE_ATTRIBUTE_NORMAL)  == 0)
-        std::cerr << "Removing Read-Only from llr.ini FAILED!" << std::endl;
+    if (SetFileAttributes(llr_ini_file_name.c_str(), FILE_ATTRIBUTE_NORMAL)  == 0)
+        std::cerr << "Removing Read-Only from " << llr_ini_file_name << " FAILED!" << std::endl;
 
-    std::string command_line = llr_app_name + " " + llr_version;
+    std::string command_line = llr_app_name + " " + llr_print_version;
     std::replace(command_line.begin(), command_line.end(), '/', '\\');
 
     PROCESS_INFORMATION process_info;
@@ -180,8 +271,6 @@ int TASK::run()
     CloseHandle( process_info.hProcess );
     CloseHandle( process_info.hThread );
 
-    CHAR buf[256];
-    DWORD len;
     if(ReadFile(hOutputRead, buf, sizeof(buf)-1, &len, NULL))
     {
         buf[len] = '\0';
@@ -189,10 +278,17 @@ int TASK::run()
     }
     else
     {
-        std::cerr << "Could not determine LLR version number, continuing..." << std::endl;
+        std::cerr << "Error reading the LLR version number, continuing..." << std::endl;
     }
 #else
-    int retval;
+    int fd_out[2];
+
+    if (pipe(fd_out) < 0)
+    {
+        std::cerr << "Failed to create pipe" << std::endl;
+        return 250; // 250: Failed to create pipe
+    }
+
     pid = fork();
     if (pid == -1)
     {
@@ -201,15 +297,16 @@ int TASK::run()
     if (pid == 0)
     {
         // we're in the child process here
-        dup2(STDERR_FILENO,STDOUT_FILENO);
-        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
+        close(fd_out[0]);
+        dup2(fd_out[1],STDOUT_FILENO);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_print_version.c_str(), NULL);
 
         // If execl failed for some reason
         // wait 5 seconds then try again,
         // A second failure is fatal
         std::cerr << "execl failed once: " << strerror(errno) << std::endl;
         boinc_sleep(5.0);
-        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_version.c_str(), NULL);
+        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_print_version.c_str(), NULL);
         
         std::cerr << "execl failed twice: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
@@ -218,17 +315,61 @@ int TASK::run()
     {
         // In the parent process
         int status;
+
         // Wait for LLR to exit
         waitpid(pid, &status, WUNTRACED);
+
+        close(fd_out[1]);
+        /* Prevent parent read() blocking on child output pipe. */
+        fcntl(fd_out[0],F_SETFL,fcntl(fd_out[0],F_GETFL)|O_NONBLOCK);
+
+        if ((len = read(fd_out[0],buf,sizeof(buf)-1)) > 0)
+        {
+          buf[len] = '\0';
+        }
+        else
+        {
+            std::cerr << "Error reading the LLR version number, continuing..." << std::endl;
+        }
     }
 #endif
 
+    std::cerr << "Req LLR version: " << llr_version_req << "." << llr_major_req << "." << llr_minor_req << std::endl;
+
+    if (llr_version_req != 0 || llr_major_req !=0 || llr_minor_req != 0)
+    {
+        int llr_version, llr_major, llr_minor;
+        // buf contains a null-terminated LLR version string (assumed to always be in this format)
+        if (sscanf(buf,"LLR Program - Version %d.%d.%d", &llr_version, &llr_major, &llr_minor) != 3)
+        {
+             std::cerr << "Error parsing the LLR version string!" << std::endl;
+             return ERR_VERSION_CHECK;
+        }
+
+        // A version number was specified in the wrapper.in, so check it
+        std::cerr << "Found LLR version: " << llr_version << "." << llr_major << "." << llr_minor << std::endl;
+        if (llr_version_req > llr_version ||
+           (llr_version_req == llr_version && llr_major_req > llr_major ) ||
+           (llr_version_req == llr_version && llr_major_req > llr_major && llr_minor_req > llr_minor))
+        {
+             std::cerr << "A newer version of LLR is required!" << std::endl;
+             return ERR_VERSION_CHECK;
+        }
+    }
+
     // Now run LLR again to perform the test
 
-    std::string in_file;
-    boinc_resolve_filename_s(in_file_name.c_str(), in_file);
+    std::string llr_in_file;
+    boinc_resolve_filename_s(llr_in_file_name.c_str(), llr_in_file);
 #ifdef __WIN32
-    command_line = llr_app_name + " " + llr_verbose + " " + in_file;
+    if (forcePRP)
+    {
+       command_line = llr_app_name + " " + llr_verbose + " " + llr_forcePRP + " " + llr_in_file;
+    }
+    else
+    {
+       command_line = llr_app_name + " " + llr_verbose + " " + llr_in_file;
+    }
     std::replace(command_line.begin(), command_line.end(), '/', '\\');
 
     memset(&process_info, 0, sizeof(process_info));
@@ -261,7 +402,6 @@ int TASK::run()
     SetThreadPriority(thread_handle, THREAD_PRIORITY_IDLE);
 
 #else
-    int fd_out[2];
 
     if (pipe(fd_out) < 0)
     {
@@ -280,7 +420,15 @@ int TASK::run()
         close(fd_out[0]);
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
-        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), in_file.c_str(), NULL);
+        if (forcePRP)
+        {
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_forcePRP.c_str(), llr_in_file.c_str(), NULL);
+
+        }
+        else
+        {
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_in_file.c_str(), NULL);
+        }
 
         // If execl failed for some reason
         // wait 5 seconds then try again,
