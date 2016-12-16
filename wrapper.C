@@ -205,9 +205,9 @@ int TASK::run()
     // Run LLR to get the version number
 
     char buf[256];
-    int len;
 
 #ifdef _WIN32
+    DWORD len;
 
     // llr.ini MUST be writeable, so explicitly remove the read-only bit
     // a read-only llr.ini might be the cause of the "3 second error"
@@ -281,7 +281,7 @@ int TASK::run()
         std::cerr << "Error reading the LLR version number, continuing..." << std::endl;
     }
 #else
-    int fd_out[2];
+    int len, fd_out[2];
 
     if (pipe(fd_out) < 0)
     {
