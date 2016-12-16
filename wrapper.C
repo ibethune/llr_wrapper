@@ -350,7 +350,7 @@ int TASK::run()
         std::cerr << "Found LLR version: " << llr_version << "." << llr_major << "." << llr_minor << std::endl;
         if (llr_version_req > llr_version ||
            (llr_version_req == llr_version && llr_major_req > llr_major ) ||
-           (llr_version_req == llr_version && llr_major_req > llr_major && llr_minor_req > llr_minor))
+           (llr_version_req == llr_version && llr_major_req == llr_major && llr_minor_req > llr_minor))
         {
              std::cerr << "A newer version of LLR is required!" << std::endl;
              return ERR_VERSION_CHECK;
