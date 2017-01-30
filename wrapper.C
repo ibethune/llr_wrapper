@@ -76,7 +76,7 @@ const std::string wrapper_in_file_name = "wrapper.in";
 const std::string out_file_name = "llr.out";
 const std::string llr_verbose = "-d";
 const std::string llr_print_version = "-v";
-const std::string llr_forcePRP = "-oForcePRP=1";
+const std::string llr_doOnlyFermatPRP = "-oForcePRP=1 -oFermatPRPtest=1";
 const std::string llr_results = "lresults.txt";
 const std::string llr_results_parsed = "lresults_parsed.txt";
 #ifndef _WIN32
@@ -364,7 +364,7 @@ int TASK::run()
 #ifdef __WIN32
     if (forcePRP)
     {
-       command_line = llr_app_name + " " + llr_verbose + " " + llr_forcePRP + " " + llr_in_file;
+       command_line = llr_app_name + " " + llr_verbose + " " + llr_doOnlyFermatPRP + " " + llr_in_file;
     }
     else
     {
@@ -422,7 +422,7 @@ int TASK::run()
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
         if (forcePRP)
         {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_forcePRP.c_str(), llr_in_file.c_str(), NULL);
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
 
         }
         else
