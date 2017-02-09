@@ -16,6 +16,7 @@
 // System headers needed in all cases
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #ifdef _WIN32
     // Windows-only headers
@@ -59,6 +60,7 @@
 #define TEST_TYPE_PRIMALITY "Primality"
 
 #define ERR_VERSION_CHECK -99
+#define ERR_INVALID_ARGS -100
 
 #define LINE_LENGTH 80
 
@@ -77,6 +79,8 @@ const std::string out_file_name = "llr.out";
 const std::string llr_verbose = "-d";
 const std::string llr_print_version = "-v";
 const std::string llr_doOnlyFermatPRP = "-oForcePRP=1 -oFermatPRPtest=1";
+const std::string llr_multiThread = "-oThreadsPerTest=";
+const std::string llr_checkpointPeriod = "-oDiskWriteTime=";
 const std::string llr_results = "lresults.txt";
 const std::string llr_results_parsed = "lresults_parsed.txt";
 #ifndef _WIN32
@@ -85,6 +89,8 @@ const std::string llr_results_parsed_dos = "lresults_parsed.txt.dos";
 
 struct TASK
 {
+    int nthreads;
+    int checkpoint_period;
     double progress;
     double old_progress;
     double old_time;
@@ -101,7 +107,7 @@ struct TASK
     int fdOutputRead;
 #endif
 
-    TASK() : progress(0.0),
+    TASK() : nthreads(1), checkpoint_period(10), progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
              last_trickle(time(NULL)),
 #ifdef _WIN32
@@ -140,18 +146,17 @@ int TASK::run()
         char line[LINE_LENGTH], test_type[TEST_TYPE_MAX_LENGTH+1];
         int wrapper_major_req, wrapper_minor_req;
 
-        std::cerr << "A " << wrapper_in_file_name << " file was found" << std::endl;
         // Read the control line from the wrapper input
         if (fgets(line, LINE_LENGTH, w_in) != NULL &&
             sscanf(line,"%d.%d %d.%d.%d %s", &wrapper_major_req, &wrapper_minor_req, &llr_version_req, &llr_major_req, &llr_minor_req, test_type) == 6)
         {
-           std::cerr << "Req wrapper version: " << wrapper_major_req << "." << wrapper_minor_req << std::endl;
            int wrapper_major, wrapper_minor;
            if (sscanf(STR(WRAPPER_VERSION),"%d.%d", &wrapper_major, &wrapper_minor) == 2)
            {
-               std::cerr << "Found wrapper version: " << wrapper_major << "." << wrapper_minor << std::endl;
                if (wrapper_major_req > wrapper_major || (wrapper_major_req == wrapper_major && wrapper_minor_req > wrapper_minor))
                {
+                   std::cerr << "Req wrapper version: " << wrapper_major_req << "." << wrapper_minor_req << std::endl;
+                   std::cerr << "Found wrapper version: " << wrapper_major << "." << wrapper_minor << std::endl;
                    std::cerr << "A newer version of the LLR wrapper is required!" << std::endl;
                    fclose(w_in);
                    return ERR_VERSION_CHECK;
@@ -164,7 +169,6 @@ int TASK::run()
                return ERR_VERSION_CHECK;
            }
 
-           std::cerr << "Test type: " << test_type << std::endl;
            if (strncmp(test_type, TEST_TYPE_PRP, TEST_TYPE_MAX_LENGTH) == 0)
            {
               std::cerr << "PRP test requested" << std::endl;
@@ -196,10 +200,6 @@ int TASK::run()
 
         fclose(l_in);
         fclose(w_in);
-    }
-    else
-    {
-        std::cerr << "No " << wrapper_in_file_name << " file was found, continue with legacy behaviour" << std::endl;
     }
 
     // Run LLR to get the version number
@@ -326,6 +326,7 @@ int TASK::run()
         if ((len = read(fd_out[0],buf,sizeof(buf)-1)) > 0)
         {
           buf[len] = '\0';
+          std::cerr << buf << std::endl;
         }
         else
         {
@@ -333,8 +334,6 @@ int TASK::run()
         }
     }
 #endif
-
-    std::cerr << "Req LLR version: " << llr_version_req << "." << llr_major_req << "." << llr_minor_req << std::endl;
 
     if (llr_version_req != 0 || llr_major_req !=0 || llr_minor_req != 0)
     {
@@ -347,7 +346,6 @@ int TASK::run()
         }
 
         // A version number was specified in the wrapper.in, so check it
-        std::cerr << "Found LLR version: " << llr_version << "." << llr_major << "." << llr_minor << std::endl;
         if (llr_version_req > llr_version ||
            (llr_version_req == llr_version && llr_major_req > llr_major ) ||
            (llr_version_req == llr_version && llr_major_req == llr_major && llr_minor_req > llr_minor))
@@ -361,16 +359,29 @@ int TASK::run()
 
     std::string llr_in_file;
     boinc_resolve_filename_s(llr_in_file_name.c_str(), llr_in_file);
+    std::ostringstream s;
+    s << checkpoint_period;
+    std::string checkpoint_str = llr_checkpointPeriod + s.str();
+    s.str("");
+    s << nthreads;
+    std::string multiThread_str = llr_multiThread + s.str();
 #ifdef __WIN32
+    
+    // Arguments that are always present
+    command_line = llr_app_name + " " + llr_verbose + " " + checkpoint_str + " " + multiThread_str;
+
+    // Optional arguments
     if (forcePRP)
     {
-       command_line = llr_app_name + " " + llr_verbose + " " + llr_doOnlyFermatPRP + " " + llr_in_file;
+       command_line = command_line + " " + llr_doOnlyFermatPRP;
     }
-    else
-    {
-       command_line = llr_app_name + " " + llr_verbose + " " + llr_in_file;
-    }
+
+    // Last, the input file
+    command_line = command_line + " " + llr_in_file;
+
     std::replace(command_line.begin(), command_line.end(), '/', '\\');
+
+    std::cerr << "LLR command line: " << command_line << std::endl;
 
     memset(&process_info, 0, sizeof(process_info));
     memset(&startup_info, 0, sizeof(startup_info));
@@ -409,6 +420,15 @@ int TASK::run()
         return 250; // 250: Failed to create pipe
     }
 
+    if (forcePRP)
+    {
+        std::cerr << "LLR command line: " << llr_app_name << " " << llr_app_name << " " << llr_verbose << " " << checkpoint_str << " " << multiThread_str << " " << llr_doOnlyFermatPRP << " " << llr_in_file << std::endl;
+    }
+    else
+    {
+        std::cerr << "LLR command line: " << llr_app_name << " " << llr_app_name << " " << llr_verbose << " " << checkpoint_str << " " << multiThread_str << " " << llr_in_file << std::endl;
+    }
+
     pid = fork();
     if (pid == -1)
     {
@@ -420,14 +440,15 @@ int TASK::run()
         close(fd_out[0]);
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
+
         if (forcePRP)
         {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
 
         }
         else
         {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), llr_in_file.c_str(), NULL);
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_in_file.c_str(), NULL);
         }
 
         // If execl failed for some reason
@@ -435,7 +456,16 @@ int TASK::run()
         // A second failure is fatal
         std::cerr << "execl failed once: " << strerror(errno) << std::endl;
         boinc_sleep(5.0);
-        retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), NULL);
+
+        if (forcePRP)
+        {
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
+
+        }
+        else
+        {
+            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_in_file.c_str(), NULL);
+        }
 
         std::cerr << "execl failed twice: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
@@ -799,6 +829,7 @@ bool unix2dos(const std::string& in, const std::string& out)
 int main(int argc, char** argv)
 {
     BOINC_OPTIONS options;
+    TASK t;
     int retval;
 
 #ifndef _WIN32
@@ -831,13 +862,58 @@ int main(int argc, char** argv)
 
     boinc_init_options (&options);
 
+    bool args_ok = false;
+
+    // First up, check command line args
+    // Only supported usage is ./llr_wrapper [-t N] (multithreading)
+
+    if (argc == 1)
+    {
+        t.nthreads = 1;
+        args_ok = true;
+    }
+    else if (argc == 3)
+    {
+        if (strcmp(argv[1], "-t") == 0)
+        {
+            char str1[132], end[10];
+            sprintf(str1, "%send", argv[2]);
+            if (sscanf(str1, "%d%s", &(t.nthreads), (char*)&end) != 2)
+            {
+                std::cerr << "-t requires a number" << std::endl;
+            }
+            else
+            {
+                if (t.nthreads < 1)
+                {
+                    std::cerr << "Number of threads (-t) must be >= 1" << std::endl;
+                }
+                else
+                {
+                    args_ok = true;
+                }
+            }
+        }
+        else
+        {
+            std::cerr << "Unrecognised argument: " << argv[1] << std::endl;
+        }
+    }
+
+    if (!args_ok)
+    {
+        std::cerr << "Usage: " << argv[0] << " [-t N]" << std::endl;
+        boinc_finish(ERR_INVALID_ARGS);
+    }
+   
+
+    // Read the user's checkpoint frequency from BOINC
     APP_INIT_DATA uc_aid;
     boinc_get_init_data(uc_aid);
-    if (uc_aid.checkpoint_period < 1.0)
-        uc_aid.checkpoint_period = 60.0;
+    t.checkpoint_period = (int)(uc_aid.checkpoint_period / 60.0);
+    if (t.checkpoint_period < 1) t.checkpoint_period = 1;
 
     // Start application
-    TASK t;
     boinc_wu_cpu_time(t.old_time);
     t.old_checkpoint_time = t.old_time;
 
