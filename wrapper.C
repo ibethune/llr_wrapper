@@ -78,7 +78,8 @@ const std::string wrapper_in_file_name = "wrapper.in";
 const std::string out_file_name = "llr.out";
 const std::string llr_verbose = "-d";
 const std::string llr_print_version = "-v";
-const std::string llr_doOnlyFermatPRP = "-oForcePRP=1 -oFermatPRPtest=1";
+const std::string llr_doOnlyPRP = "-oForcePRP=1";
+const std::string llr_doFermatPRP = "-oFermatPRPtest=1";
 const std::string llr_multiThread = "-oThreadsPerTest=";
 const std::string llr_checkpointPeriod = "-oDiskWriteTime=";
 const std::string llr_results = "lresults.txt";
@@ -107,7 +108,7 @@ struct TASK
     int fdOutputRead;
 #endif
 
-    TASK() : nthreads(1), checkpoint_period(10), progress(0.0),
+    TASK() : nthreads(0), checkpoint_period(10), progress(0.0),
              old_progress(0.0), old_time(0.0), old_checkpoint_time(0.0),
              last_trickle(time(NULL)),
 #ifdef _WIN32
@@ -368,12 +369,17 @@ int TASK::run()
 #ifdef __WIN32
     
     // Arguments that are always present
-    command_line = llr_app_name + " " + llr_verbose + " " + checkpoint_str + " " + multiThread_str;
+    command_line = llr_app_name + " " + llr_verbose + " " + checkpoint_str;
 
     // Optional arguments
+
+    if (nthreads != 0) // nthreads == 0 means the user didn't specify the number of threads
+    {
+       command_line = command_line + " " + multiThread_str;
+
     if (forcePRP)
     {
-       command_line = command_line + " " + llr_doOnlyFermatPRP;
+       command_line = command_line + " " + llr_doOnlyPRP + " " + llr_doFermatPRP;
     }
 
     // Last, the input file
@@ -420,14 +426,39 @@ int TASK::run()
         return 250; // 250: Failed to create pipe
     }
 
+    // Build the argument list (max 9 args, including NULL terminator)
+    const char *argList[9];
+
+    int i = 0;
+    // Arguments that are always present
+
+    argList[i] = llr_app_name.c_str(); i++;
+    argList[i] = llr_verbose.c_str(); i++;
+    argList[i] = checkpoint_str.c_str(); i++;
+
+    // Optional arguments
+    if (nthreads != 0) // nthreads == 0 means the user didn't specify the number of threads
+    {
+       argList[i] = multiThread_str.c_str(); i++;
+    }
+
     if (forcePRP)
     {
-        std::cerr << "LLR command line: " << llr_app_name << " " << llr_app_name << " " << llr_verbose << " " << checkpoint_str << " " << multiThread_str << " " << llr_doOnlyFermatPRP << " " << llr_in_file << std::endl;
+        argList[i] = llr_doOnlyPRP.c_str(); i++;
+        argList[i] = llr_doFermatPRP.c_str(); i++;
     }
-    else
+
+    // Last, the input file
+    argList[i] = llr_in_file.c_str(); i++;
+    argList[i] = NULL;
+
+    std::cerr << "LLR command line: ";
+
+    for (int arg = 0; arg < i; arg++)
     {
-        std::cerr << "LLR command line: " << llr_app_name << " " << llr_app_name << " " << llr_verbose << " " << checkpoint_str << " " << multiThread_str << " " << llr_in_file << std::endl;
+        std::cerr << " " << argList[arg];
     }
+    std::cerr << std::endl;
 
     pid = fork();
     if (pid == -1)
@@ -441,33 +472,17 @@ int TASK::run()
         dup2(fd_out[1],STDOUT_FILENO);
         setpriority(PRIO_PROCESS, 0, PROCESS_IDLE_PRIORITY);
 
-        if (forcePRP)
-        {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
-
-        }
-        else
-        {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_in_file.c_str(), NULL);
-        }
+        retval = execv(argList[0], (char **)argList);
 
         // If execl failed for some reason
         // wait 5 seconds then try again,
         // A second failure is fatal
-        std::cerr << "execl failed once: " << strerror(errno) << std::endl;
+        std::cerr << "execv failed once: " << strerror(errno) << std::endl;
         boinc_sleep(5.0);
 
-        if (forcePRP)
-        {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_doOnlyFermatPRP.c_str(), llr_in_file.c_str(), NULL);
+        retval = execv(argList[0], (char **)argList);
 
-        }
-        else
-        {
-            retval = execl(llr_app_name.c_str(), llr_app_name.c_str(), llr_verbose.c_str(), checkpoint_str.c_str(), multiThread_str.c_str(), llr_in_file.c_str(), NULL);
-        }
-
-        std::cerr << "execl failed twice: " << strerror(errno) << std::endl;
+        std::cerr << "execv failed twice: " << strerror(errno) << std::endl;
         exit(ERR_EXEC);
     }
     else
@@ -869,7 +884,6 @@ int main(int argc, char** argv)
 
     if (argc == 1)
     {
-        t.nthreads = 1;
         args_ok = true;
     }
     else if (argc == 3)
