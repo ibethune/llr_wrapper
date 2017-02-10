@@ -376,6 +376,7 @@ int TASK::run()
     if (nthreads != 0) // nthreads == 0 means the user didn't specify the number of threads
     {
        command_line = command_line + " " + multiThread_str;
+    }
 
     if (forcePRP)
     {
