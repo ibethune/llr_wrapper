@@ -925,7 +925,7 @@ int main(int argc, char** argv)
     // Read the user's checkpoint frequency from BOINC
     APP_INIT_DATA uc_aid;
     boinc_get_init_data(uc_aid);
-    t.checkpoint_period = (int)(uc_aid.checkpoint_period / 60.0);
+    t.checkpoint_period = (int)ceilf(uc_aid.checkpoint_period / 60.0);
     if (t.checkpoint_period < 1) t.checkpoint_period = 1;
 
     // Start application
