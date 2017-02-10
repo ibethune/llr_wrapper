@@ -17,6 +17,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <math.h>
 
 #ifdef _WIN32
     // Windows-only headers
